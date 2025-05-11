@@ -1,10 +1,11 @@
 // app/api/upload-csv/route.js (or .ts if using TypeScript)
 import { NextResponse } from 'next/server';
-import redis from '../../lib/lib';
+import { connectToDatabase } from '@/app/lib/mongodb';
 import Papa from 'papaparse';
 
 export async function POST(req) {
   try {
+    const { db } = await connectToDatabase();
     const formData = await req.formData();
     const file = formData.get('file');
 
@@ -12,8 +13,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    const text = await file.text(); // Read text content of the file
-
+    const text = await file.text();
     const parsed = Papa.parse(text, {
       header: true,
       skipEmptyLines: true,
@@ -26,8 +26,14 @@ export async function POST(req) {
       visits: Number(row.visits || 0),
     }));
 
-    // Store in Redis with 1-hour TTL
-    await redis.set('customers', JSON.stringify(records), 'EX', 3600);
+    // Insert or update customers in MongoDB
+    for (const customer of records) {
+      await db.collection('customers').updateOne(
+        { email: customer.email },
+        { $set: customer },
+        { upsert: true }
+      );
+    }
 
     return NextResponse.json({ customers: records });
   } catch (error) {
@@ -35,11 +41,15 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
 export async function GET() {
-  const cached = await redis.get('customers');
-  if (cached) {
-    return NextResponse.json({ customers: JSON.parse(cached), source: 'redis' });
+  try {
+    const { db } = await connectToDatabase();
+    const customers = await db.collection('customers').find({}).toArray();
+    return NextResponse.json({ customers });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ customers: [], error: 'Internal Server Error' }, { status: 500 });
   }
-  return NextResponse.json({ customers: [], source: 'empty' });
 }
 

@@ -1,8 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import redis from '../../../lib/lib';
+import { NextResponse } from 'next/server';
+import { connectToDatabase } from '@/app/lib/mongodb';
 
+// POST - Create a new customer campaign
 export async function POST(req) {
   try {
+    const { db } = await connectToDatabase();
     const body = await req.json();
     const { name, targetAudience, message, customers, tag, scheduledTime } = body;
     const campaignId = uuidv4();
@@ -21,17 +24,17 @@ export async function POST(req) {
       delivered: customers.length,
       failed: 0,
     };
-    await redis.set(`customer_campaign:${campaignId}`, JSON.stringify(campaign));
-    // Send dummy message and log for each customer
-    for (const customer of customers) {
-      const log = {
-        campaignId,
-        customer: customer.name,
-        customerId: customer.id,
-        message,
-        timestamp: new Date().toISOString(),
-      };
-      await redis.rpush('customer_campaign_logs', JSON.stringify(log));
+    await db.collection('customer_campaigns').insertOne(campaign);
+    // Store logs in MongoDB
+    const logs = customers.map(customer => ({
+      campaignId,
+      customer: customer.name,
+      customerId: customer.id,
+      message,
+      timestamp: new Date().toISOString(),
+    }));
+    if (logs.length > 0) {
+      await db.collection('customer_campaign_logs').insertMany(logs);
     }
     return NextResponse.json({ success: true, campaignId });
   } catch (error) {
@@ -42,6 +45,7 @@ export async function POST(req) {
 
 // Helper to fetch all logs
 export async function getAllCustomerCampaignLogs() {
-  const logs = await redis.lrange('customer_campaign_logs', 0, -1);
-  return logs.map(log => JSON.parse(log));
+  const { db } = await connectToDatabase();
+  const logs = await db.collection('customer_campaign_logs').find({}).toArray();
+  return logs.map(log => log);
 } 
