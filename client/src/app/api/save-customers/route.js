@@ -2,9 +2,16 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/app/lib/mongodb';
 import Papa from 'papaparse';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/lib/auth';
 
 export async function POST(req) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.email;
     const { db } = await connectToDatabase();
     const formData = await req.formData();
     const file = formData.get('file');
@@ -21,6 +28,7 @@ export async function POST(req) {
 
     const records = parsed.data.map((row) => ({
       ...row,
+      userId,
       totalSpend: Number(row.totalSpend || 0),
       loyaltyPoints: Number(row.loyaltyPoints || 0),
       visits: Number(row.visits || 0),
@@ -29,7 +37,7 @@ export async function POST(req) {
     // Insert or update customers in MongoDB
     for (const customer of records) {
       await db.collection('customers').updateOne(
-        { email: customer.email },
+        { email: customer.email, userId },
         { $set: customer },
         { upsert: true }
       );
@@ -44,8 +52,13 @@ export async function POST(req) {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.email;
     const { db } = await connectToDatabase();
-    const customers = await db.collection('customers').find({}).toArray();
+    const customers = await db.collection('customers').find({ userId }).toArray();
     return NextResponse.json({ customers });
   } catch (error) {
     console.error(error);
