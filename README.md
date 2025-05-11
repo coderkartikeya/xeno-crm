@@ -63,4 +63,4 @@ A modern CRM platform built with Next.js, MongoDB, Redis, and NextAuth.js. XenoC
 - `src/app/dashboard` — Dashboard pages (customers, orders, campaigns)
 
 ## Contact
-For questions or support, open an issue or contact [yourname@yourdomain.com](mailto:yourname@yourdomain.com).
+For questions or support, open an issue or contact [yourname@yourdomain.com](mailto:kartikeyavats04@gmail.com).
