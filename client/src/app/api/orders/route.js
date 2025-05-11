@@ -44,7 +44,7 @@ export async function POST(request) {
       ...orderData,
       userId,
       date: new Date().toISOString(),
-      status: "pending",
+      status: orderData.status || "pending",
       createdAt: new Date(),
     };
     // Insert order into MongoDB

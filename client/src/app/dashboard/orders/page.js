@@ -16,82 +16,72 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch orders from Redis API
+  // Fetch orders from MongoDB API
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/orders/redis');
+        const response = await fetch('/api/orders');
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
         }
         const data = await response.json();
-        setOrders(data.orders);
+        setOrders(Array.isArray(data) ? data : data.orders || []);
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-
     fetchOrders();
   }, []);
 
-  // Handle CSV upload
+  // Handle CSV upload (POST each order to /api/orders)
   const handleCSVUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
+    const text = await file.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+    const records = parsed.data;
     try {
-      const response = await fetch('/api/orders/redis', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to import orders');
+      setLoading(true);
+      let newOrders = [];
+      for (const order of records) {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          newOrders.push({ ...order, _id: data.orderId });
+        }
       }
-
-      const data = await response.json();
-      setOrders(data.orders);
+      // Refetch orders after upload
+      const refetch = await fetch('/api/orders');
+      const allOrders = await refetch.json();
+      setOrders(Array.isArray(allOrders) ? allOrders : allOrders.orders || []);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
-
-  // Fetch from API link
-  const fetchFromApiLink = async () => {
-    if (!apiLink) return;
-    
+  const fetchFromApiLink=async()=>{
     try {
+      setLoading(true);
       const response = await fetch(apiLink);
       if (!response.ok) {
-        throw new Error('Failed to fetch from API');
+        throw new Error('Failed to fetch orders from API link');
       }
-
       const data = await response.json();
-      const orders = Array.isArray(data) ? data : [data];
-
-      // Update Redis with new orders
-      const updateResponse = await fetch('/api/orders/redis', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders }),
-      });
-
-      if (!updateResponse.ok) {
-        throw new Error('Failed to update orders');
-      }
-
-      const updateData = await updateResponse.json();
-      setOrders(updateData.orders);
+      setOrders(Array.isArray(data) ? data : data.orders || []);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   // Export to CSV
   const handleExportCSV = async () => {

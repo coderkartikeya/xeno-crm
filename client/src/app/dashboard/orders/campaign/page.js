@@ -45,7 +45,7 @@ export default function OrderCampaignsPage() {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/orders/redis');
+      const response = await fetch('/api/orders');
       if (response.ok) {
         const data = await response.json();
         setOrders(data.orders);
@@ -72,21 +72,21 @@ export default function OrderCampaignsPage() {
   };
 
   const fetchProductStats = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/orders/products-stats');
-      if (response.ok) {
-        const data = await response.json();
-        setProductStats(data.products || []);
-      } else {
-        setError('Failed to fetch product stats');
-      }
-    } catch (err) {
-      setError('Error fetching product stats');
-    } finally {
-      setIsLoading(false);
-    }
+    // setIsLoading(true);
+    // setError(null);
+    // try {
+    //   const response = await fetch('/api/orders/products-stats');
+    //   if (response.ok) {
+    //     const data = await response.json();
+    //     setProductStats(data.products || []);
+    //   } else {
+    //     setError('Failed to fetch product stats');
+    //   }
+    // } catch (err) {
+    //   setError('Error fetching product stats');
+    // } finally {
+    //   setIsLoading(false);
+    // }
   };
 
   // Apply segmentation filters
